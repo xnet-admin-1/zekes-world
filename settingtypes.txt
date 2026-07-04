@@ -1,0 +1,16 @@
+# Zeek's World settings
+
+# LLM API endpoint for Oliver's speech
+zw_oliver_api_url (Oliver API URL) string https://inf.xnet.ngo/v1/chat/completions
+
+# LLM API key
+zw_oliver_api_key (Oliver API Key) string
+
+# Center latitude for OSM map generation
+zw_mapgen_lat (Center Latitude) float 43.6057601
+
+# Center longitude for OSM map generation
+zw_mapgen_lon (Center Longitude) float -116.3932135
+
+# Radius in meters for map generation
+zw_mapgen_radius (Map Radius in meters) int 200
