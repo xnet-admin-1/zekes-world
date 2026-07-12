@@ -184,8 +184,8 @@ local function create_hud(player)
     -- Speech bubble background (hidden initially)
     player_huds[name].speech_bg = player:hud_add({
         hud_elem_type = "image",
-        position = { x = 0.5, y = 0.15 },
-        scale = { x = 4, y = 1.5 },
+        position = { x = 0.5, y = 0.12 },
+        scale = { x = 2, y = 1 },
         text = "",  -- Empty = hidden
         alignment = { x = 0, y = 0 },
         offset = { x = 0, y = 0 },
@@ -194,13 +194,13 @@ local function create_hud(player)
     -- Speech bubble text (hidden initially)
     player_huds[name].speech_text = player:hud_add({
         hud_elem_type = "text",
-        position = { x = 0.5, y = 0.15 },
+        position = { x = 0.5, y = 0.12 },
         scale = { x = 100, y = 100 },
         text = "",
         number = 0xFFFFFF,
         alignment = { x = 0, y = 0 },
         offset = { x = 0, y = 0 },
-        size = { x = 2, y = 2 },  -- Large text for readability
+        size = { x = 1, y = 1 },
     })
 
     -- Setup hotbar and inventory

@@ -13,21 +13,41 @@ local SYSTEM_PROMPT = "You are Oliver, a 1-year-old orange tabby cat. You speak 
 -- Follow parameters
 local FOLLOW_DISTANCE = 3.0
 local FOLLOW_SPEED = 4.0
-local SPEAK_COOLDOWN = 10.0
+local SPEAK_COOLDOWN = 45.0
 
 -------------------------------------------------------------------------------
 -- LLM API
 -------------------------------------------------------------------------------
 
 local function query_llm(prompt, callback)
+    -- Varied fallback phrases when LLM is unavailable
+    local fallbacks = {
+        "Meow! This place is fun!",
+        "Mrrp! *stretches* I like it here!",
+        "Purrrr... what should we build?",
+        "*bats at a butterfly* Meow!",
+        "Mew! Let's explore over there!",
+        "*rubs against your leg* Purrrr",
+        "Meow meow! I see something cool!",
+        "*yawns* This is a nice spot!",
+        "Mrrp! *wiggles tail* Adventure time!",
+        "*pounces on nothing* Hehe! Meow!",
+        "Purr purr... you're doing great!",
+        "*sits and tilts head* Mew?",
+        "Meow! Can we go up high?",
+        "*rolls over* Belly rubs? No? Ok meow!",
+        "Mrrp! That block looks tasty... just kidding!",
+    }
+    local fallback = fallbacks[math.random(#fallbacks)]
+
     if not minetest.request_http_api then
-        callback("Mrrp! *stretches*")
+        callback(fallback)
         return
     end
 
     local http = minetest.request_http_api()
     if not http then
-        callback("Mrrp! *stretches*")
+        callback(fallback)
         return
     end
 
@@ -57,7 +77,7 @@ local function query_llm(prompt, callback)
                 return
             end
         end
-        callback("Mrrp! *stretches*")
+        callback(fallback)
     end)
 end
 
@@ -67,16 +87,25 @@ end
 
 local oliver_entity = {
     initial_properties = {
-        physical = true,
+        physical = false,
         collide_with_objects = false,
-        collisionbox = { -0.3, 0.0, -0.3, 0.3, 0.6, 0.3 },
-        visual = "mesh",
-        -- TODO: Replace with actual cat mesh
-        visual_size = { x = 1, y = 1, z = 1 },
-        textures = { "zw_oliver_cat.png" },
+        collisionbox = { -0.2, 0.0, -0.2, 0.2, 0.5, 0.2 },
+        visual = "cube",
+        visual_size = { x = 0.3, y = 0.3, z = 0.4 },
+        textures = {
+            "zw_oliver_top.png",   -- top
+            "zw_oliver_top.png",   -- bottom
+            "zw_oliver_side.png",  -- right
+            "zw_oliver_side.png",  -- left
+            "zw_oliver_cat.png",   -- front (face)
+            "zw_oliver_back.png",  -- back
+        },
         makes_footstep_sound = false,
         nametag = "Oliver",
         nametag_color = "#FF9933",
+        static_save = false,
+        infotext = "",
+        pointable = false,
     },
 
     -- State
@@ -84,6 +113,7 @@ local oliver_entity = {
     _last_speak_time = 0,
     _last_chunk = { x = 0, z = 0 },
     _greeted = false,
+    _idle_timer = 0,
 }
 
 function oliver_entity:on_activate(staticdata)
@@ -99,22 +129,36 @@ function oliver_entity:on_step(dtime)
     local pos = self.object:get_pos()
     local player_pos = player:get_pos()
     local dir = vector.subtract(player_pos, pos)
+    dir.y = 0 -- Ignore vertical for horizontal distance
     local dist = vector.length(dir)
 
-    -- Follow behavior
-    if dist > FOLLOW_DISTANCE then
-        dir = vector.normalize(dir)
-        local vel = vector.multiply(dir, FOLLOW_SPEED)
-        vel.y = 0 -- Stay on ground plane
-        self.object:set_velocity(vel)
-    else
-        self.object:set_velocity({ x = 0, y = 0, z = 0 })
+    -- Face the player
+    if dist > 0.5 then
+        local yaw = math.atan2(dir.z, dir.x) - math.pi / 2
+        self.object:set_yaw(yaw)
     end
+
+    -- Move toward player using set_pos (no physics bouncing)
+    local target = vector.copy(pos)
+
+    if dist > FOLLOW_DISTANCE then
+        local norm_dir = vector.normalize(dir)
+        local speed = FOLLOW_SPEED * dtime
+        target.x = pos.x + norm_dir.x * speed
+        target.z = pos.z + norm_dir.z * speed
+    elseif dist < 1.5 then
+        -- Too close, stay put
+    end
+
+    -- Always sit at ground level (y = 1)
+    target.y = 1.0
+
+    self.object:set_pos(target)
+    self.object:set_velocity({ x = 0, y = 0, z = 0 })
 
     -- Teleport if too far (player flew/teleported)
     if dist > 30 then
-        local offset = vector.new(2, 0, 2)
-        self.object:set_pos(vector.add(player_pos, offset))
+        self.object:set_pos(vector.new(player_pos.x + 3, 1.0, player_pos.z + 3))
     end
 
     -- Initial greeting
@@ -129,6 +173,13 @@ function oliver_entity:on_step(dtime)
     if chunk_x ~= self._last_chunk.x or chunk_z ~= self._last_chunk.z then
         self._last_chunk = { x = chunk_x, z = chunk_z }
         self:speak("Zeek found a new area! Comment on what you see.")
+    end
+
+    -- Idle chatter every 90 seconds
+    self._idle_timer = self._idle_timer + dtime
+    if self._idle_timer > 90 then
+        self._idle_timer = 0
+        self:speak("Zeek is playing! Say something fun or encouraging.")
     end
 end
 
@@ -154,32 +205,39 @@ minetest.register_entity(MOD_NAME .. ":oliver", oliver_entity)
 -- Spawn Oliver when player joins
 -------------------------------------------------------------------------------
 
+local oliver_objects = {}
+
 minetest.register_on_joinplayer(function(player)
-    local pos = player:get_pos()
-    local spawn_pos = vector.add(pos, vector.new(2, 0, 2))
-    local obj = minetest.add_entity(spawn_pos, MOD_NAME .. ":oliver")
-    if obj then
-        local ent = obj:get_luaentity()
-        ent._owner = player:get_player_name()
-    end
+    local name = player:get_player_name()
+    -- Spawn Oliver after a short delay to ensure world is loaded
+    minetest.after(2.0, function()
+        local p = minetest.get_player_by_name(name)
+        if not p then return end
+
+        -- Remove any existing Oliver for this player
+        if oliver_objects[name] and oliver_objects[name]:get_pos() then
+            oliver_objects[name]:remove()
+        end
+
+        local pos = p:get_pos()
+        local spawn_pos = vector.new(pos.x + 3, 1.0, pos.z + 3)
+        local obj = minetest.add_entity(spawn_pos, MOD_NAME .. ":oliver")
+        if obj then
+            local ent = obj:get_luaentity()
+            ent._owner = name
+            oliver_objects[name] = obj
+        end
+    end)
 end)
 
--- Clean up Oliver when player leaves
+-- Clean up tracking on leave (entity removes itself via static_save=false)
 minetest.register_on_leaveplayer(function(player)
     local name = player:get_player_name()
-    for _, obj in pairs(minetest.get_connected_players()) do
-        -- Remove all Oliver entities owned by this player
-    end
-    -- Find and remove Oliver entities for this player
-    local pos = player:get_pos()
-    if pos then
-        local objects = minetest.get_objects_inside_radius(pos, 50)
-        for _, obj in ipairs(objects) do
-            local ent = obj:get_luaentity()
-            if ent and ent.name == MOD_NAME .. ":oliver" and ent._owner == name then
-                obj:remove()
-            end
+    if oliver_objects[name] then
+        if oliver_objects[name]:get_pos() then
+            oliver_objects[name]:remove()
         end
+        oliver_objects[name] = nil
     end
 end)
 

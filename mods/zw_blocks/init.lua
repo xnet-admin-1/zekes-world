@@ -23,6 +23,46 @@ local function register_block(name, description, color_hex, groups)
 end
 
 -------------------------------------------------------------------------------
+-- Sound helpers
+-------------------------------------------------------------------------------
+
+local function sound_grass()
+    return { footstep = { name = "default_grass_footstep", gain = 0.4 },
+             dig = { name = "__group" }, dug = { name = "default_dug_crumbly" },
+             place = { name = "default_place_node" } }
+end
+
+local function sound_dirt()
+    return { footstep = { name = "default_dirt_footstep", gain = 0.4 },
+             dig = { name = "__group" }, dug = { name = "default_dug_crumbly" },
+             place = { name = "default_place_node" } }
+end
+
+local function sound_stone()
+    return { footstep = { name = "default_stone_footstep", gain = 0.4 },
+             dig = { name = "__group" }, dug = { name = "default_dug_cracky" },
+             place = { name = "default_place_node_hard" } }
+end
+
+local function sound_wood()
+    return { footstep = { name = "default_wood_footstep", gain = 0.4 },
+             dig = { name = "__group" }, dug = { name = "default_dug_choppy" },
+             place = { name = "default_place_node" } }
+end
+
+local function sound_sand()
+    return { footstep = { name = "default_sand_footstep", gain = 0.4 },
+             dig = { name = "__group" }, dug = { name = "default_dug_crumbly" },
+             place = { name = "default_place_node" } }
+end
+
+local function sound_glass()
+    return { footstep = { name = "default_glass_footstep", gain = 0.3 },
+             dig = { name = "__group" }, dug = { name = "default_dug_cracky" },
+             place = { name = "default_place_node_hard" } }
+end
+
+-------------------------------------------------------------------------------
 -- Core terrain blocks
 -------------------------------------------------------------------------------
 
@@ -30,30 +70,35 @@ minetest.register_node(MOD_NAME .. ":grass", {
     description = "Grass",
     tiles = { MOD_NAME .. "_grass_top.png", MOD_NAME .. "_dirt.png", MOD_NAME .. "_grass_side.png" },
     groups = { crumbly = 3, soil = 1, creative_breakable = 1 },
+    sounds = sound_grass(),
 })
 
 minetest.register_node(MOD_NAME .. ":dirt", {
     description = "Dirt",
     tiles = { MOD_NAME .. "_dirt.png" },
     groups = { crumbly = 3, soil = 1, creative_breakable = 1 },
+    sounds = sound_dirt(),
 })
 
 minetest.register_node(MOD_NAME .. ":stone", {
     description = "Stone",
     tiles = { MOD_NAME .. "_stone.png" },
     groups = { cracky = 3, creative_breakable = 1 },
+    sounds = sound_stone(),
 })
 
 minetest.register_node(MOD_NAME .. ":sand", {
     description = "Sand",
     tiles = { MOD_NAME .. "_sand.png" },
     groups = { crumbly = 3, falling_node = 1, creative_breakable = 1 },
+    sounds = sound_sand(),
 })
 
 minetest.register_node(MOD_NAME .. ":wood", {
     description = "Wood",
     tiles = { MOD_NAME .. "_wood.png" },
     groups = { choppy = 2, creative_breakable = 1 },
+    sounds = sound_wood(),
 })
 
 minetest.register_node(MOD_NAME .. ":leaf", {
@@ -95,6 +140,7 @@ minetest.register_node(MOD_NAME .. ":glass", {
     paramtype = "light",
     sunlight_propagates = true,
     groups = { cracky = 3, oddly_breakable_by_hand = 3, creative_breakable = 1 },
+    sounds = sound_glass(),
 })
 
 -------------------------------------------------------------------------------
@@ -127,6 +173,7 @@ for _, b in ipairs(fun_blocks) do
         tiles = { MOD_NAME .. "_" .. b.name .. ".png" },
         groups = groups,
         light_source = light_source,
+        sounds = sound_stone(),
     })
 end
 
@@ -143,6 +190,19 @@ minetest.register_node(MOD_NAME .. ":cloud", {
     sunlight_propagates = true,
     groups = { cracky = 3, creative_breakable = 1 },
     light_source = 4,
+})
+
+-------------------------------------------------------------------------------
+-- Bedrock (unbreakable)
+-------------------------------------------------------------------------------
+
+minetest.register_node(MOD_NAME .. ":bedrock", {
+    description = "Bedrock",
+    tiles = { MOD_NAME .. "_stone.png" },
+    groups = { not_in_creative_inventory = 1 },
+    is_ground_content = false,
+    diggable = false,
+    drop = "",
 })
 
 -------------------------------------------------------------------------------
@@ -165,3 +225,24 @@ end
 
 minetest.log("action", "[zw_blocks] Block palette loaded (" ..
     tostring(8 + #fun_blocks + 2) .. " block types)")
+
+-------------------------------------------------------------------------------
+-- Hand tool - allows breaking all blocks in creative mode
+-------------------------------------------------------------------------------
+
+minetest.register_item(":", {
+    type = "none",
+    wield_image = "wieldhand.png",
+    wield_scale = { x = 1, y = 1, z = 2.5 },
+    tool_capabilities = {
+        full_punch_interval = 0.5,
+        max_drop_level = 3,
+        groupcaps = {
+            crumbly = { times = { [1] = 1.5, [2] = 1.0, [3] = 0.7 }, uses = 0, maxlevel = 3 },
+            cracky = { times = { [1] = 2.0, [2] = 1.5, [3] = 1.0 }, uses = 0, maxlevel = 3 },
+            snappy = { times = { [1] = 1.0, [2] = 0.7, [3] = 0.5 }, uses = 0, maxlevel = 3 },
+            choppy = { times = { [1] = 1.5, [2] = 1.0, [3] = 0.7 }, uses = 0, maxlevel = 3 },
+        },
+        damage_groups = { fleshy = 1 },
+    },
+})
